@@ -26,4 +26,4 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - run: npm ci
       - run: npm run build
-      - run: pm2 reload shop_api
+      - run: pm2 reload tht-service-api
