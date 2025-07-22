@@ -2,10 +2,12 @@ import {
   customerSchema,
   customerSchemaCreate,
 } from "../schemas/customer.schema.js";
+import { DELETE_STATUS } from "../utils/contanst.js";
 
 export const getCustomers = async (req, res) => {
   const { rows } = await req.exec(
-    `SELECT * FROM customers ORDER BY created_at DESC`
+    `SELECT * FROM customers WHERE status != $1 ORDER BY created_at DESC`,
+    [DELETE_STATUS]
   );
   return res.resp(rows);
 };
@@ -85,8 +87,8 @@ export const updateCustomer = async (req, res) => {
 export const deleteCustomer = async (req, res) => {
   const { id } = req.params;
   const { rows } = await req.exec(
-    `DELETE FROM customers WHERE id = $1 RETURNING *`,
-    [id]
+    `UPDATE customers SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [DELETE_STATUS, id]
   );
   return res.resp(rows[0]);
 };

@@ -38,8 +38,7 @@ CREATE TABLE customers (
     address TEXT,
     company TEXT,
     rfc TEXT,
-    status TEXT NOT NULL DEFAULT 'active'
-        CHECK (status IN ('active','inactive')),
+    status TEXT NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
