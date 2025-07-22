@@ -1,15 +1,7 @@
-import Joi from "joi";
-
-const customerSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required(),
-  last_name: Joi.string().min(2).max(100).required(),
-  email: Joi.string().email().required(),
-  phone: Joi.string().optional(),
-  address: Joi.string().optional(),
-  company: Joi.string().optional(),
-  rfc: Joi.string().optional(),
-  status: Joi.string().valid("active", "inactive").optional(),
-});
+import {
+  customerSchema,
+  customerSchemaCreate,
+} from "../schemas/customer.schema.js";
 
 export const getCustomers = async (req, res) => {
   const { rows } = await req.exec(
@@ -27,13 +19,24 @@ export const getCustomer = async (req, res) => {
 };
 
 export const createCustomer = async (req, res) => {
-  const { error } = customerSchema.validate(req.body);
+  const { error } = customerSchemaCreate.validate(req.body);
   if (error) {
-    throw "BE005";
+    console.log("error", error);
+    throw "BE100";
   }
 
   const { name, last_name, email, phone, address, company, rfc, status } =
     req.body;
+
+  // Validar que el correo sea único
+  const { rows: emailRows } = await req.exec(
+    `SELECT id FROM customers WHERE email = $1`,
+    [email]
+  );
+  if (emailRows.length > 0) {
+    throw "BE104"; // Correo ya registrado
+  }
+
   const { rows } = await req.exec(
     `INSERT INTO customers (name, last_name, email, phone, address, company, rfc, status) 
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -45,12 +48,23 @@ export const createCustomer = async (req, res) => {
 export const updateCustomer = async (req, res) => {
   const { error } = customerSchema.validate(req.body);
   if (error) {
-    throw "BE005";
+    console.log("error", error);
+    throw "BE100";
   }
 
   const { id } = req.params;
   const { name, last_name, email, phone, address, company, rfc, status } =
     req.body;
+
+  // Validar que el correo sea único (excluyendo el propio cliente)
+  const { rows: emailRows } = await req.exec(
+    `SELECT id FROM customers WHERE email = $1 AND id != $2`,
+    [email, id]
+  );
+  if (emailRows.length > 0) {
+    throw "BE104"; // Correo ya registrado en otro cliente
+  }
+
   const { rows } = await req.exec(
     `UPDATE customers SET 
        name = $1, 

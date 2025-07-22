@@ -113,6 +113,7 @@ export const getTicket = async (req, res) => {
 export const createTicket = async (req, res) => {
   const { error } = ticketSchemaCreate.validate(req.body);
   if (error) {
+    console.log("error", error);
     throw "BE100";
   }
 
@@ -167,6 +168,7 @@ export const createTicket = async (req, res) => {
 export const updateTicket = async (req, res) => {
   const { error } = ticketSchema.validate(req.body);
   if (error) {
+    console.log("error", error);
     throw "BE100";
   }
 
