@@ -1,0 +1,13 @@
+services:
+  postgres:
+    container_name: tht_service_postgres
+    image: postgres:13.6
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=tht_service
+    volumes:
+      - ./init-scripts:/docker-entrypoint-initdb.d
