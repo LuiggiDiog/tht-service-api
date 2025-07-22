@@ -100,8 +100,7 @@ CREATE TABLE tickets (
         REFERENCES customers(id) ON DELETE CASCADE,
     technician_id BIGINT NOT NULL
         REFERENCES users(id) ON DELETE CASCADE,
-    status TEXT NOT NULL DEFAULT 'open'
-        CHECK (status IN ('open','in_progress','closed')),
+    status TEXT NOT NULL DEFAULT 'open',
     description TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

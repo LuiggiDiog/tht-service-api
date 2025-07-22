@@ -5,30 +5,11 @@ import {
   ticketSchemaCreate,
 } from "../schemas/ticket.schema.js";
 import { mediaUpload } from "../services/media.js";
+import { DELETE_STATUS } from "../utils/contanst.js";
 
 // Obtener todos los tickets
 export const getTickets = async (req, res) => {
-  const { rows } = await req.exec(`
-    SELECT t.*, 
-           c.name as customer_name, 
-           c.email as customer_email,
-           c.phone as customer_phone,
-           u.name as technician_name,
-           u.email as technician_email
-    FROM tickets t
-    LEFT JOIN customers c ON t.customer_id = c.id
-    LEFT JOIN users u ON t.technician_id = u.id
-    ORDER BY t.created_at DESC
-  `);
-  return res.resp(rows);
-};
-
-// Obtener un ticket específico con todas sus evidencias
-export const getTicket = async (req, res) => {
-  const { id } = req.params;
-
-  // Obtener el ticket principal
-  const { rows: ticketRows } = await req.exec(
+  const { rows } = await req.exec(
     `
     SELECT t.*, 
            c.name as customer_name, 
@@ -39,7 +20,22 @@ export const getTicket = async (req, res) => {
     FROM tickets t
     LEFT JOIN customers c ON t.customer_id = c.id
     LEFT JOIN users u ON t.technician_id = u.id
-    WHERE t.id = $1
+    WHERE t.status != $1
+    ORDER BY t.created_at DESC
+  `,
+    [DELETE_STATUS]
+  );
+  return res.resp(rows);
+};
+
+// Obtener un ticket específico con todas sus evidencias
+export const getTicket = async (req, res) => {
+  const { id } = req.params;
+
+  // Obtener el ticket principal
+  const { rows: ticketRows } = await req.exec(
+    `
+    SELECT t.* FROM tickets t WHERE t.id = $1
   `,
     [id]
   );
@@ -53,11 +49,8 @@ export const getTicket = async (req, res) => {
   // Obtener todas las evidencias del ticket
   const { rows: evidenceRows } = await req.exec(
     `
-    SELECT te.*, 
-           u.name as user_name,
-           u.email as user_email
+    SELECT te.*
     FROM ticket_evidences te
-    LEFT JOIN users u ON te.user_id = u.id
     WHERE te.ticket_id = $1
     ORDER BY te.created_at ASC
   `,
@@ -96,14 +89,11 @@ export const getTicket = async (req, res) => {
 // Crear un nuevo ticket con evidencia de recepción automática
 export const createTicket = async (req, res) => {
   const { error } = ticketSchemaCreate.validate(req.body);
-  console.log("error", error);
   if (error) {
     throw "BE100";
   }
 
   const { customer_id, technician_id, description } = req.body;
-  const { evidence_comment } = req.body;
-  const userId = req.user?.id; // Usuario autenticado que crea el ticket
 
   // Verificar que el cliente existe
   const { rows: customerCheck } = await req.exec(
@@ -141,20 +131,7 @@ export const createTicket = async (req, res) => {
 
     const ticket = ticketRows[0];
 
-    // Crear automáticamente la evidencia de recepción
-    const { rows: evidenceRows } = await req.exec(
-      `
-      INSERT INTO ticket_evidences (ticket_id, type, user_id, comment) 
-      VALUES ($1, 'reception', $2, $3) 
-      RETURNING *
-    `,
-      [ticket.id, userId || technician_id, evidence_comment]
-    );
-
     await req.exec("COMMIT");
-
-    // Retornar el ticket con la evidencia creada
-    ticket.reception_evidence = evidenceRows[0];
 
     return res.resp(ticket);
   } catch (err) {
@@ -196,9 +173,9 @@ export const deleteTicket = async (req, res) => {
 
   const { rows } = await req.exec(
     `
-    DELETE FROM tickets WHERE id = $1 RETURNING *
+    UPDATE tickets SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *
   `,
-    [id]
+    [DELETE_STATUS, id]
   );
 
   if (!rows.length) {
@@ -277,7 +254,6 @@ export const createTicketEvidence = async (req, res) => {
           // Subir archivo usando el servicio de media
           const uploadResult = await mediaUpload(uploadedFile);
           const mediaData = uploadResult.file;
-          console.log("mediaData", mediaData);
 
           // Crear registro en ticket_evidence_media
           await req.exec(

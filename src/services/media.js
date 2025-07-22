@@ -6,7 +6,6 @@ const baseURL = `${URL_MEDIA_SERVICE}/api/projects`;
 
 export const mediaUpload = async (file) => {
   const url = `${baseURL}/${SLUG_MEDIA_SERVICE}/media/upload`;
-  console.log("url", url);
 
   // Usar FormData compatible con node-fetch
   const formData = new FormData();
