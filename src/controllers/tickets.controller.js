@@ -2,7 +2,9 @@ import {
   ticketSchema,
   ticketEvidenceSchema,
   ticketPartChangeSchema,
+  ticketSchemaCreate,
 } from "../schemas/ticket.schema.js";
+import { mediaUpload } from "../services/media.js";
 
 // Obtener todos los tickets
 export const getTickets = async (req, res) => {
@@ -93,12 +95,14 @@ export const getTicket = async (req, res) => {
 
 // Crear un nuevo ticket con evidencia de recepción automática
 export const createTicket = async (req, res) => {
-  const { error } = ticketSchema.validate(req.body);
+  const { error } = ticketSchemaCreate.validate(req.body);
+  console.log("error", error);
   if (error) {
-    throw "BE005";
+    throw "BE100";
   }
 
-  const { customer_id, technician_id, status, description } = req.body;
+  const { customer_id, technician_id, description } = req.body;
+  const { evidence_comment } = req.body;
   const userId = req.user?.id; // Usuario autenticado que crea el ticket
 
   // Verificar que el cliente existe
@@ -132,7 +136,7 @@ export const createTicket = async (req, res) => {
       VALUES ($1, $2, $3, $4) 
       RETURNING *
     `,
-      [customer_id, technician_id, status || "open", description]
+      [customer_id, technician_id, "open", description]
     );
 
     const ticket = ticketRows[0];
@@ -141,10 +145,10 @@ export const createTicket = async (req, res) => {
     const { rows: evidenceRows } = await req.exec(
       `
       INSERT INTO ticket_evidences (ticket_id, type, user_id, comment) 
-      VALUES ($1, 'reception', $2, 'Ticket recibido y registrado en el sistema') 
+      VALUES ($1, 'reception', $2, $3) 
       RETURNING *
     `,
-      [ticket.id, userId || technician_id]
+      [ticket.id, userId || technician_id, evidence_comment]
     );
 
     await req.exec("COMMIT");
@@ -206,17 +210,28 @@ export const deleteTicket = async (req, res) => {
 
 // Crear una nueva evidencia para un ticket
 export const createTicketEvidence = async (req, res) => {
-  const { error } = ticketEvidenceSchema.validate(req.body);
-  if (error) {
-    throw "BE005";
-  }
+  // Para FormData, los campos vienen en req.body y los archivos en req.files
+  const { ticket_id, type, user_id, comment } = req.body;
+  const uploadedFiles = req.files || [];
 
-  const { ticket_id, type, user_id, comment, media } = req.body;
+  // Convertir strings de FormData a números y preparar datos para validación
+  const validationData = {
+    ticket_id: parseInt(ticket_id),
+    type,
+    user_id: parseInt(user_id),
+    comment,
+  };
+
+  // Validar usando el schema
+  const { error } = ticketEvidenceSchema.validate(validationData);
+  if (error) {
+    throw "BE005"; // Error de validación
+  }
 
   // Verificar que el ticket existe
   const { rows: ticketCheck } = await req.exec(
     `SELECT id, status FROM tickets WHERE id = $1`,
-    [ticket_id]
+    [validationData.ticket_id]
   );
 
   if (!ticketCheck.length) {
@@ -226,7 +241,7 @@ export const createTicketEvidence = async (req, res) => {
   // Verificar que el usuario existe
   const { rows: userCheck } = await req.exec(
     `SELECT id FROM users WHERE id = $1`,
-    [user_id]
+    [validationData.user_id]
   );
 
   if (!userCheck.length) {
@@ -244,40 +259,67 @@ export const createTicketEvidence = async (req, res) => {
       VALUES ($1, $2, $3, $4) 
       RETURNING *
     `,
-      [ticket_id, type, user_id, comment]
+      [
+        validationData.ticket_id,
+        validationData.type,
+        validationData.user_id,
+        validationData.comment,
+      ]
     );
 
     const evidence = evidenceRows[0];
+    const failedUploads = [];
 
-    // Si hay medios, crearlos
-    if (media && media.length > 0) {
-      for (const mediaItem of media) {
-        await req.exec(
-          `
-          INSERT INTO ticket_evidence_media (evidence_id, media_type, storage_id, url) 
-          VALUES ($1, $2, $3, $4)
-        `,
-          [
-            evidence.id,
-            mediaItem.media_type,
-            mediaItem.storage_id,
-            mediaItem.url,
-          ]
-        );
+    // Procesar archivos subidos si los hay
+    if (uploadedFiles.length > 0) {
+      for (const uploadedFile of uploadedFiles) {
+        try {
+          // Subir archivo usando el servicio de media
+          const uploadResult = await mediaUpload(uploadedFile);
+          const mediaData = uploadResult.file;
+          console.log("mediaData", mediaData);
+
+          // Crear registro en ticket_evidence_media
+          await req.exec(
+            `
+            INSERT INTO ticket_evidence_media (evidence_id, media_type, storage_id, url) 
+            VALUES ($1, $2, $3, $4)
+          `,
+            [
+              evidence.id,
+              mediaData.type,
+              mediaData.id, // storage_id del servicio de media
+              mediaData.public_url, // URL del archivo subido
+            ]
+          );
+        } catch (fileError) {
+          console.error("Error procesando archivo:", fileError);
+          failedUploads.push({
+            filename: uploadedFile.originalname || uploadedFile.name,
+            error: fileError.message,
+          });
+        }
       }
     }
 
     // Si la evidencia es de tipo 'delivery', automáticamente cambiar el estado del ticket a 'closed'
-    if (type === "delivery") {
+    if (validationData.type === "delivery") {
       await req.exec(
         `UPDATE tickets SET status = 'closed', updated_at = NOW() WHERE id = $1`,
-        [ticket_id]
+        [validationData.ticket_id]
       );
     }
 
     await req.exec("COMMIT");
 
-    return res.resp(evidence);
+    // Agregar información sobre archivos fallidos si los hay
+    const response = {
+      ...evidence,
+      uploaded_files_count: uploadedFiles.length - failedUploads.length,
+      failed_uploads: failedUploads.length > 0 ? failedUploads : undefined,
+    };
+
+    return res.resp(response);
   } catch (err) {
     await req.exec("ROLLBACK");
     throw err;

@@ -1,10 +1,21 @@
 import Joi from "joi";
 
 export const ticketSchema = Joi.object({
-  customer_id: Joi.number().required(),
-  technician_id: Joi.number().required(),
+  id: Joi.number().required(),
+  customer_id: Joi.string().required(),
+  technician_id: Joi.string().required(),
   status: Joi.string().valid("open", "in_progress", "closed").default("open"),
   description: Joi.string().optional(),
+});
+
+export const ticketSchemaCreate = Joi.object({
+  id: Joi.number().allow(null).optional(),
+  customer_id: Joi.string().required(),
+  technician_id: Joi.string().required(),
+  status: Joi.string().valid("open", "in_progress", "closed").default("open"),
+  description: Joi.string().required(),
+  evidence_type: Joi.string().optional(),
+  evidence_comment: Joi.string().required(),
 });
 
 export const ticketEvidenceSchema = Joi.object({

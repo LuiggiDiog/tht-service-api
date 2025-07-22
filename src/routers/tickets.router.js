@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import {
   getTickets,
   getTicket,
@@ -13,6 +14,25 @@ import {
   getTicketsByCustomer,
 } from "../controllers/tickets.controller.js";
 
+// Configuración de multer para manejar archivos en memoria
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25MB máximo por archivo
+  },
+  fileFilter: (req, file, cb) => {
+    // Aceptar solo imágenes y videos
+    if (
+      file.mimetype.startsWith("image/") ||
+      file.mimetype.startsWith("video/")
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se permiten archivos de imagen y video"), false);
+    }
+  },
+});
+
 const router = Router();
 
 // Rutas principales de tickets
@@ -22,8 +42,8 @@ router.post("/", createTicket);
 router.put("/:id", updateTicket);
 router.delete("/:id", deleteTicket);
 
-// Rutas para evidencias
-router.post("/evidences", createTicketEvidence);
+// Rutas para evidencias - usar multer para manejar archivos
+router.post("/evidences", upload.array("files", 10), createTicketEvidence);
 router.get("/:ticket_id/evidences", getTicketEvidences);
 
 // Rutas para cambios de piezas
