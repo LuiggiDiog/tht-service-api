@@ -32,8 +32,14 @@ CREATE TABLE users (
 CREATE TABLE customers (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     phone TEXT,
+    address TEXT,
+    company TEXT,
+    rfc TEXT,
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active','inactive')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -156,3 +162,28 @@ INSERT INTO users (name, email, password, role)
 VALUES
   ('Super Admin', 'admin@gmail.com', '$2b$10$vHeurs.MZNjncuYULvVMDe2tFdUfaOcvQkcwA5nVC2td0R7Az3NIm', 'super_admin'),
   ('Technician', 'tecnico@gmail.com', '$2b$10$vHeurs.MZNjncuYULvVMDe2tFdUfaOcvQkcwA5nVC2td0R7Az3NIm', 'support');
+
+INSERT INTO customers (name, last_name, email, phone, address, company, rfc, status)
+VALUES
+  ('Juan', 'Pérez', 'customer1@gmail.com', '1234567890', 'Av. Principal 123', 'Empresa ABC', 'ABC123456789', 'active'),
+  ('María', 'González', 'customer2@gmail.com', '0987654321', 'Calle Secundaria 456', 'Empresa XYZ', 'XYZ987654321', 'active');
+
+INSERT INTO tickets (customer_id, technician_id, status, description)
+VALUES
+  (1, 2, 'open', 'Ticket 1'),
+  (2, 2, 'open', 'Ticket 2');
+
+INSERT INTO ticket_evidences (ticket_id, type, user_id, comment)
+VALUES
+  (1, 'reception', 2, 'Evidencia 1'),
+  (2, 'reception', 2, 'Evidencia 2');
+
+INSERT INTO ticket_evidence_media (evidence_id, media_type, storage_id, url)
+VALUES
+  (1, 'image', 'storage1', 'https://example.com/image1.jpg'),
+  (2, 'image', 'storage2', 'https://example.com/image2.jpg');
+
+INSERT INTO ticket_part_changes (ticket_id, removed_part_name, installed_part_name, removed_evidence_id, installed_evidence_id)
+VALUES
+  (1, 'Part 1', 'Part 2', 1, 2),
+  (2, 'Part 3', 'Part 4', 3, 4);

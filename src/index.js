@@ -22,6 +22,7 @@ import ordersRouter from "./routers/orders.router.js";
 import orderItemsRouter from "./routers/order_items.router.js";
 import paymentsRouter from "./routers/payments.router.js";
 import inventoryMovementsRouter from "./routers/inventory_movements.router.js";
+import ticketsRouter from "./routers/tickets.router.js";
 import authMiddle from "./middlewares/auth.middle.js";
 
 const app = express();
@@ -45,6 +46,7 @@ app.use("/orders", ordersRouter);
 app.use("/order_items", orderItemsRouter);
 app.use("/payments", paymentsRouter);
 app.use("/inventory_movements", inventoryMovementsRouter);
+app.use("/tickets", authMiddle, ticketsRouter);
 
 app.use("/products-public", productsPublicRouter);
 
