@@ -5,6 +5,7 @@ import {
   getTicket,
   createTicket,
   updateTicket,
+  changeTicketStatus,
   deleteTicket,
   createTicketEvidence,
   getTicketEvidences,
@@ -40,6 +41,7 @@ router.get("/", getTickets);
 router.get("/:id", getTicket);
 router.post("/", createTicket);
 router.put("/:id", updateTicket);
+router.put("/:id/status", changeTicketStatus);
 router.delete("/:id", deleteTicket);
 
 // Rutas para evidencias - usar multer para manejar archivos

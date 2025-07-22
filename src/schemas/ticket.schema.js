@@ -6,6 +6,13 @@ export const ticketSchema = Joi.object({
   technician_id: Joi.string().required(),
   status: Joi.string().valid("open", "in_progress", "closed").default("open"),
   description: Joi.string().optional(),
+  created_at: Joi.date().optional(),
+  updated_at: Joi.date().optional(),
+  customer_name: Joi.string().optional(),
+  customer_email: Joi.string().optional(),
+  customer_phone: Joi.string().optional(),
+  technician_name: Joi.string().optional(),
+  technician_email: Joi.string().optional(),
 });
 
 export const ticketSchemaCreate = Joi.object({
@@ -16,6 +23,10 @@ export const ticketSchemaCreate = Joi.object({
   description: Joi.string().required(),
   evidence_type: Joi.string().optional(),
   evidence_comment: Joi.string().required(),
+});
+
+export const ticketStatusSchema = Joi.object({
+  status: Joi.string().valid("open", "in_progress", "closed").required(),
 });
 
 export const ticketEvidenceSchema = Joi.object({

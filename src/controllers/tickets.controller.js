@@ -3,6 +3,7 @@ import {
   ticketEvidenceSchema,
   ticketPartChangeSchema,
   ticketSchemaCreate,
+  ticketStatusSchema,
 } from "../schemas/ticket.schema.js";
 import { mediaUpload } from "../services/media.js";
 import { DELETE_STATUS } from "../utils/contanst.js";
@@ -45,6 +46,28 @@ export const getTicket = async (req, res) => {
   }
 
   const ticket = ticketRows[0];
+
+  // Obtener información del customer
+  if (ticket.customer_id) {
+    const { rows: customerRows } = await req.exec(
+      `SELECT name, email, phone FROM customers WHERE id = $1`,
+      [ticket.customer_id]
+    );
+    if (customerRows.length) {
+      ticket.customer = customerRows[0];
+    }
+  }
+
+  // Obtener información del technician
+  if (ticket.technician_id) {
+    const { rows: technicianRows } = await req.exec(
+      `SELECT name, email FROM users WHERE id = $1`,
+      [ticket.technician_id]
+    );
+    if (technicianRows.length) {
+      ticket.technician = technicianRows[0];
+    }
+  }
 
   // Obtener todas las evidencias del ticket
   const { rows: evidenceRows } = await req.exec(
@@ -144,7 +167,7 @@ export const createTicket = async (req, res) => {
 export const updateTicket = async (req, res) => {
   const { error } = ticketSchema.validate(req.body);
   if (error) {
-    throw "BE005";
+    throw "BE100";
   }
 
   const { id } = req.params;
@@ -158,6 +181,27 @@ export const updateTicket = async (req, res) => {
     RETURNING *
   `,
     [customer_id, technician_id, status, description, id]
+  );
+
+  if (!rows.length) {
+    throw "BE004";
+  }
+
+  return res.resp(rows[0]);
+};
+
+export const changeTicketStatus = async (req, res) => {
+  const { error } = ticketStatusSchema.validate(req.body);
+  if (error) {
+    throw "BE100";
+  }
+
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const { rows } = await req.exec(
+    `UPDATE tickets SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [status, id]
   );
 
   if (!rows.length) {
