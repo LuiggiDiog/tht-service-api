@@ -9,6 +9,7 @@ export const userSchema = Joi.object({
     .valid("super_admin", "admin", "manager", "support")
     .required(),
   status: Joi.string().valid("active", "inactive").optional(),
+  branch: Joi.string().required(),
 });
 
 export const userSchemaCreate = Joi.object({
@@ -20,4 +21,5 @@ export const userSchemaCreate = Joi.object({
     .valid("super_admin", "admin", "manager", "support")
     .required(),
   status: Joi.string().valid("active", "inactive").optional(),
+  branch: Joi.string().required(),
 });

@@ -2,27 +2,36 @@ import Joi from "joi";
 
 export const ticketSchema = Joi.object({
   id: Joi.number().required(),
-  customer_id: Joi.string().required(),
-  technician_id: Joi.string().required(),
-  status: Joi.string().valid("open", "in_progress", "closed").default("open"),
+  customer_id: Joi.number().integer().required(),
+  technician_id: Joi.number().integer().required(),
+  device_model: Joi.string().required(),
+  device_serial: Joi.string().required(),
   description: Joi.string().optional(),
+  amount: Joi.number().min(0).required(),
+  payment_method: Joi.string().required(),
+  payment_first_amount: Joi.number().min(0).required(),
+  payment_second_amount: Joi.number().min(0).required(),
+  status: Joi.string().valid("open", "in_progress", "closed").default("open"),
+  created_by: Joi.number().required(),
   created_at: Joi.date().optional(),
   updated_at: Joi.date().optional(),
-  customer_name: Joi.string().optional(),
-  customer_email: Joi.string().optional(),
-  customer_phone: Joi.string().optional(),
-  technician_name: Joi.string().optional(),
-  technician_email: Joi.string().optional(),
 });
 
 export const ticketSchemaCreate = Joi.object({
   id: Joi.number().allow(null).optional(),
-  customer_id: Joi.string().required(),
-  technician_id: Joi.string().required(),
-  status: Joi.string().valid("open", "in_progress", "closed").default("open"),
+  customer_id: Joi.number().integer().required(),
+  technician_id: Joi.number().integer().required(),
+  device_model: Joi.string().required(),
+  device_serial: Joi.string().required(),
   description: Joi.string().required(),
+  amount: Joi.number().min(0).required(),
+  payment_method: Joi.string().required(),
+  payment_first_amount: Joi.number().min(0).required(),
+  payment_second_amount: Joi.number().min(0).optional(),
+  status: Joi.string().optional(),
+
   evidence_type: Joi.string().optional(),
-  evidence_comment: Joi.string().required(),
+  evidence_comment: Joi.string().optional(),
 });
 
 export const ticketStatusSchema = Joi.object({
@@ -34,8 +43,11 @@ export const ticketEvidenceSchema = Joi.object({
   type: Joi.string()
     .valid("reception", "part_removed", "part_installed", "delivery")
     .required(),
-  user_id: Joi.number().required(),
+  created_by: Joi.number().required(),
   comment: Joi.string().optional(),
+  status: Joi.string().default("active"),
+  created_at: Joi.date().optional(),
+  updated_at: Joi.date().optional(),
   media: Joi.array()
     .items(
       Joi.object({

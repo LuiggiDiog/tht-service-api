@@ -28,7 +28,7 @@ export const createUser = async (req, res) => {
     throw "BE005";
   }
 
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, branch } = req.body;
 
   // Validar que el correo sea único
   const { rows: emailRows } = await req.exec(
@@ -43,8 +43,8 @@ export const createUser = async (req, res) => {
   const hashedPassword = bcrypt.hashSync(password, 10);
 
   const { rows } = await req.exec(
-    `INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [name, email, hashedPassword, role]
+    `INSERT INTO users (name, email, branch, password, role) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [name, email, branch, hashedPassword, role]
   );
   return res.resp(rows[0]);
 };
@@ -57,7 +57,7 @@ export const updateUser = async (req, res) => {
   }
 
   const { id } = req.params;
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, branch } = req.body;
 
   // Validar que el correo sea único (excluyendo el propio usuario)
   const { rows: emailRows } = await req.exec(
@@ -72,8 +72,8 @@ export const updateUser = async (req, res) => {
   const hashedPassword = bcrypt.hashSync(password, 10);
 
   const { rows } = await req.exec(
-    `UPDATE users SET name = $1, email = $2, password = $3, role = $4, updated_at = NOW() WHERE id = $5 RETURNING *`,
-    [name, email, hashedPassword, role, id]
+    `UPDATE users SET name = $1, email = $2, branch = $3, password = $4, role = $5, updated_at = NOW() WHERE id = $6 RETURNING *`,
+    [name, email, branch, hashedPassword, role, id]
   );
   return res.resp(rows[0]);
 };

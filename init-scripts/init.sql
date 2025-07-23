@@ -18,9 +18,10 @@ CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
+    branch VARCHAR(100) NOT NULL,
     password TEXT NOT NULL,
     role TEXT NOT NULL
-        CHECK (role IN ('super_admin','admin','manager','support')),
+        CHECK (role IN ('super_admin','admin','support', 'vendor')),
     status TEXT NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -95,12 +96,21 @@ CREATE TABLE product_categories (
 -- --------------------------------------------------
 CREATE TABLE tickets (
     id BIGSERIAL PRIMARY KEY,
-    customer_id BIGINT NOT NULL
-        REFERENCES customers(id) ON DELETE CASCADE,
-    technician_id BIGINT NOT NULL
-        REFERENCES users(id) ON DELETE CASCADE,
-    status TEXT NOT NULL DEFAULT 'open',
+    customer_id BIGINT NOT NULL REFERENCES customers(id),
+    technician_id BIGINT NOT NULL REFERENCES users(id),
+
+    device_model VARCHAR(100) NOT NULL,
+    device_serial VARCHAR(100) NOT NULL,
+
     description TEXT,
+    amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
+
+    payment_method VARCHAR(100) NOT NULL DEFAULT 'cash',
+    payment_first_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (payment_first_amount >= 0),
+    payment_second_amount NUMERIC(12,2) DEFAULT 0 CHECK (payment_second_amount >= 0),
+
+    status TEXT NOT NULL DEFAULT 'open',
+    created_by BIGINT NOT NULL REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -110,13 +120,13 @@ CREATE TABLE tickets (
 -- --------------------------------------------------
 CREATE TABLE ticket_evidences (
     id BIGSERIAL PRIMARY KEY,
-    ticket_id BIGINT NOT NULL
-        REFERENCES tickets(id) ON DELETE CASCADE,
-    type TEXT NOT NULL
-        CHECK (type IN ('reception','part_removed','part_installed','delivery')),
-    user_id BIGINT NOT NULL
-        REFERENCES users(id) ON DELETE SET NULL,
+    ticket_id BIGINT NOT NULL REFERENCES tickets(id),
+
+    type TEXT NOT NULL,
     comment TEXT,
+
+    status TEXT NOT NULL DEFAULT 'active',
+    created_by BIGINT NOT NULL REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -126,12 +136,12 @@ CREATE TABLE ticket_evidences (
 -- --------------------------------------------------
 CREATE TABLE ticket_evidence_media (
     id BIGSERIAL PRIMARY KEY,
-    evidence_id BIGINT NOT NULL
-        REFERENCES ticket_evidences(id) ON DELETE CASCADE,
-    media_type TEXT NOT NULL
-        CHECK (media_type IN ('image','video')),
-    storage_id TEXT NOT NULL,      -- external storage identifier
-    url TEXT NOT NULL,             -- access URL
+    evidence_id BIGINT NOT NULL REFERENCES ticket_evidences(id),
+
+    media_type TEXT NOT NULL CHECK (media_type IN ('image','video')),
+    storage_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -156,25 +166,25 @@ CREATE TABLE ticket_part_changes (
 -- --------------------------------------------------
 -- 11. Seed data (example)
 -- --------------------------------------------------
-INSERT INTO users (name, email, password, role)
+INSERT INTO users (name, email, password, role, branch)
 VALUES
-  ('Super Admin', 'admin@gmail.com', '$2b$10$vHeurs.MZNjncuYULvVMDe2tFdUfaOcvQkcwA5nVC2td0R7Az3NIm', 'super_admin'),
-  ('Technician', 'tecnico@gmail.com', '$2b$10$vHeurs.MZNjncuYULvVMDe2tFdUfaOcvQkcwA5nVC2td0R7Az3NIm', 'support');
+  ('Super Admin', 'admin@gmail.com', '$2b$10$vHeurs.MZNjncuYULvVMDe2tFdUfaOcvQkcwA5nVC2td0R7Az3NIm', 'super_admin', 'quito'),
+  ('Technician', 'tecnico@gmail.com', '$2b$10$vHeurs.MZNjncuYULvVMDe2tFdUfaOcvQkcwA5nVC2td0R7Az3NIm', 'support', 'quito');
 
 INSERT INTO customers (name, last_name, email, phone, address, company, rfc, status)
 VALUES
   ('Juan', 'Pérez', 'customer1@gmail.com', '1234567890', 'Av. Principal 123', 'Empresa ABC', 'ABC123456789', 'active'),
   ('María', 'González', 'customer2@gmail.com', '0987654321', 'Calle Secundaria 456', 'Empresa XYZ', 'XYZ987654321', 'active');
 
-INSERT INTO tickets (customer_id, technician_id, status, description)
+INSERT INTO tickets (customer_id, technician_id, device_model, device_serial, description, amount, payment_method, payment_first_amount, payment_second_amount, status, created_by)
 VALUES
-  (1, 2, 'open', 'Ticket 1'),
-  (2, 2, 'open', 'Ticket 2');
+  (1, 2, 'iPhone 13', '1234567890', 'Ticket 1', 100, 'cash', 50, 50, 'open', 1),
+  (2, 2, 'Samsung Galaxy S21', '0987654321', 'Ticket 2', 200, 'cash', 100, 100, 'open', 1);
 
-INSERT INTO ticket_evidences (ticket_id, type, user_id, comment)
+INSERT INTO ticket_evidences (ticket_id, type, comment, status, created_by)
 VALUES
-  (1, 'reception', 2, 'Evidencia 1'),
-  (2, 'reception', 2, 'Evidencia 2');
+  (1, 'reception', 'Evidencia 1', 'active', 1),
+  (2, 'reception', 'Evidencia 2', 'active', 1);
 
 INSERT INTO ticket_evidence_media (evidence_id, media_type, storage_id, url)
 VALUES

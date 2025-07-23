@@ -117,7 +117,18 @@ export const createTicket = async (req, res) => {
     throw "BE100";
   }
 
-  const { customer_id, technician_id, description } = req.body;
+  const created_by = req.user.id;
+  const {
+    customer_id,
+    technician_id,
+    device_model,
+    device_serial,
+    description,
+    amount,
+    payment_method,
+    payment_first_amount,
+    payment_second_amount,
+  } = req.body;
 
   // Verificar que el cliente existe
   const { rows: customerCheck } = await req.exec(
@@ -139,6 +150,15 @@ export const createTicket = async (req, res) => {
     throw "BE004"; // Técnico no encontrado o sin permisos
   }
 
+  // Verificar que el usuario creador existe
+  const { rows: creatorCheck } = await req.exec(
+    `SELECT id FROM users WHERE id = $1`,
+    [created_by]
+  );
+  if (!creatorCheck.length) {
+    throw "BE004"; // Usuario creador no encontrado
+  }
+
   // Iniciar transacción
   await req.exec("BEGIN");
 
@@ -146,11 +166,23 @@ export const createTicket = async (req, res) => {
     // Crear el ticket
     const { rows: ticketRows } = await req.exec(
       `
-      INSERT INTO tickets (customer_id, technician_id, status, description) 
-      VALUES ($1, $2, $3, $4) 
+      INSERT INTO tickets (customer_id, technician_id, device_model, device_serial, description, amount, payment_method, payment_first_amount, payment_second_amount, status, created_by) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
       RETURNING *
     `,
-      [customer_id, technician_id, "open", description]
+      [
+        customer_id,
+        technician_id,
+        device_model,
+        device_serial,
+        description,
+        amount,
+        payment_method,
+        payment_first_amount,
+        payment_second_amount,
+        "open",
+        created_by,
+      ]
     );
 
     const ticket = ticketRows[0];
@@ -173,16 +205,41 @@ export const updateTicket = async (req, res) => {
   }
 
   const { id } = req.params;
-  const { customer_id, technician_id, status, description } = req.body;
+  const {
+    customer_id,
+    technician_id,
+    device_model,
+    device_serial,
+    description,
+    amount,
+    payment_method,
+    payment_first_amount,
+    payment_second_amount,
+    status,
+    created_by,
+  } = req.body;
 
   const { rows } = await req.exec(
     `
     UPDATE tickets 
-    SET customer_id = $1, technician_id = $2, status = $3, description = $4, updated_at = NOW()
-    WHERE id = $5 
+    SET customer_id = $1, technician_id = $2, device_model = $3, device_serial = $4, description = $5, amount = $6, payment_method = $7, payment_first_amount = $8, payment_second_amount = $9, status = $10, created_by = $11, updated_at = NOW()
+    WHERE id = $12 
     RETURNING *
   `,
-    [customer_id, technician_id, status, description, id]
+    [
+      customer_id,
+      technician_id,
+      device_model,
+      device_serial,
+      description,
+      amount,
+      payment_method,
+      payment_first_amount,
+      payment_second_amount,
+      status,
+      created_by,
+      id,
+    ]
   );
 
   if (!rows.length) {
@@ -234,14 +291,15 @@ export const deleteTicket = async (req, res) => {
 // Crear una nueva evidencia para un ticket
 export const createTicketEvidence = async (req, res) => {
   // Para FormData, los campos vienen en req.body y los archivos en req.files
-  const { ticket_id, type, user_id, comment } = req.body;
+  const created_by = req.user.id;
+  const { ticket_id, type, comment } = req.body;
   const uploadedFiles = req.files || [];
 
   // Convertir strings de FormData a números y preparar datos para validación
   const validationData = {
     ticket_id: parseInt(ticket_id),
     type,
-    user_id: parseInt(user_id),
+    created_by: parseInt(created_by),
     comment,
   };
 
@@ -264,7 +322,7 @@ export const createTicketEvidence = async (req, res) => {
   // Verificar que el usuario existe
   const { rows: userCheck } = await req.exec(
     `SELECT id FROM users WHERE id = $1`,
-    [validationData.user_id]
+    [validationData.created_by]
   );
 
   if (!userCheck.length) {
@@ -278,14 +336,14 @@ export const createTicketEvidence = async (req, res) => {
     // Crear la evidencia
     const { rows: evidenceRows } = await req.exec(
       `
-      INSERT INTO ticket_evidences (ticket_id, type, user_id, comment) 
+      INSERT INTO ticket_evidences (ticket_id, type, created_by, comment) 
       VALUES ($1, $2, $3, $4) 
       RETURNING *
     `,
       [
         validationData.ticket_id,
         validationData.type,
-        validationData.user_id,
+        validationData.created_by,
         validationData.comment,
       ]
     );
@@ -358,7 +416,7 @@ export const getTicketEvidences = async (req, res) => {
            u.name as user_name,
            u.email as user_email
     FROM ticket_evidences te
-    LEFT JOIN users u ON te.user_id = u.id
+    LEFT JOIN users u ON te.created_by = u.id
     WHERE te.ticket_id = $1
     ORDER BY te.created_at ASC
   `,
