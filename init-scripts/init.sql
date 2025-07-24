@@ -138,7 +138,7 @@ CREATE TABLE ticket_evidence_media (
     id BIGSERIAL PRIMARY KEY,
     evidence_id BIGINT NOT NULL REFERENCES ticket_evidences(id),
 
-    media_type TEXT NOT NULL CHECK (media_type IN ('image','video')),
+    media_type TEXT NOT NULL,
     storage_id TEXT NOT NULL,
     url TEXT NOT NULL,
 
