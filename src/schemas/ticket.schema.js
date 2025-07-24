@@ -40,23 +40,10 @@ export const ticketStatusSchema = Joi.object({
 
 export const ticketEvidenceSchema = Joi.object({
   ticket_id: Joi.number().required(),
-  type: Joi.string()
-    .valid("reception", "part_removed", "part_installed", "delivery")
-    .required(),
+  type: Joi.string().required(),
   created_by: Joi.number().required(),
   comment: Joi.string().optional(),
   status: Joi.string().default("active"),
-  created_at: Joi.date().optional(),
-  updated_at: Joi.date().optional(),
-  media: Joi.array()
-    .items(
-      Joi.object({
-        media_type: Joi.string().valid("image", "video").required(),
-        storage_id: Joi.string().required(),
-        url: Joi.string().required(),
-      })
-    )
-    .optional(),
 });
 
 export const ticketPartChangeSchema = Joi.object({

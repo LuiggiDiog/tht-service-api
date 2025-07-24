@@ -13,6 +13,7 @@ import {
   getPartChanges,
   getTicketsByTechnician,
   getTicketsByCustomer,
+  deleteTicketEvidence,
 } from "../controllers/tickets.controller.js";
 
 // Configuración de multer para manejar archivos en memoria
@@ -47,6 +48,7 @@ router.delete("/:id", deleteTicket);
 // Rutas para evidencias - usar multer para manejar archivos
 router.post("/evidences", upload.array("files", 10), createTicketEvidence);
 router.get("/:ticket_id/evidences", getTicketEvidences);
+router.delete("/evidences/:id", deleteTicketEvidence);
 
 // Rutas para cambios de piezas
 router.post("/part-changes", createPartChange);

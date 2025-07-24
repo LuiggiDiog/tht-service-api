@@ -50,7 +50,7 @@ export const getTicket = async (req, res) => {
   // Obtener información del customer
   if (ticket.customer_id) {
     const { rows: customerRows } = await req.exec(
-      `SELECT name, email, phone FROM customers WHERE id = $1`,
+      `SELECT name, last_name, email, phone FROM customers WHERE id = $1`,
       [ticket.customer_id]
     );
     if (customerRows.length) {
@@ -74,10 +74,10 @@ export const getTicket = async (req, res) => {
     `
     SELECT te.*
     FROM ticket_evidences te
-    WHERE te.ticket_id = $1
+    WHERE te.ticket_id = $1 AND te.status != $2
     ORDER BY te.created_at ASC
   `,
-    [id]
+    [id, DELETE_STATUS]
   );
 
   // Obtener los medios para cada evidencia
@@ -306,7 +306,8 @@ export const createTicketEvidence = async (req, res) => {
   // Validar usando el schema
   const { error } = ticketEvidenceSchema.validate(validationData);
   if (error) {
-    throw "BE005"; // Error de validación
+    console.log("error", error);
+    throw "BE100"; // Error de validación
   }
 
   // Verificar que el ticket existe
@@ -439,6 +440,20 @@ export const getTicketEvidences = async (req, res) => {
   return res.resp(rows);
 };
 
+export const deleteTicketEvidence = async (req, res) => {
+  const { id } = req.params;
+
+  const { rows } = await req.exec(
+    `UPDATE ticket_evidences SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [DELETE_STATUS, id]
+  );
+
+  if (!rows.length) {
+    throw "BE004";
+  }
+
+  return res.resp(rows[0]);
+};
 // Crear un cambio de pieza
 export const createPartChange = async (req, res) => {
   const { error } = ticketPartChangeSchema.validate(req.body);
