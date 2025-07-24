@@ -14,6 +14,7 @@ import {
   getTicketsByTechnician,
   getTicketsByCustomer,
   deleteTicketEvidence,
+  closeTicket,
 } from "../controllers/tickets.controller.js";
 
 // Configuración de multer para manejar archivos en memoria
@@ -43,6 +44,7 @@ router.get("/:id", getTicket);
 router.post("/", createTicket);
 router.put("/:id", updateTicket);
 router.put("/:id/status", changeTicketStatus);
+router.put("/:id/close", closeTicket);
 router.delete("/:id", deleteTicket);
 
 // Rutas para evidencias - usar multer para manejar archivos

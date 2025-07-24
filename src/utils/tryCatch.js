@@ -99,6 +99,14 @@ const lstErr = [
     status: 400,
   },
   {
+    code: "BE106",
+    message: {
+      es: "El monto del segundo pago no coincide con el monto pendiente",
+      en: "The second payment amount does not match the pending amount",
+    },
+    status: 400,
+  },
+  {
     code: "BE400",
     message: {
       es: "No se actualizó el registro",

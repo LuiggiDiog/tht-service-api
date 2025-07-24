@@ -4,6 +4,7 @@ import {
   ticketPartChangeSchema,
   ticketSchemaCreate,
   ticketStatusSchema,
+  ticketCloseSchema,
 } from "../schemas/ticket.schema.js";
 import { mediaUpload } from "../services/media.js";
 import { DELETE_STATUS } from "../utils/contanst.js";
@@ -261,6 +262,53 @@ export const changeTicketStatus = async (req, res) => {
   const { rows } = await req.exec(
     `UPDATE tickets SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
     [status, id]
+  );
+
+  if (!rows.length) {
+    throw "BE004";
+  }
+
+  return res.resp(rows[0]);
+};
+
+export const closeTicket = async (req, res) => {
+  const { id } = req.params;
+  const { payment_second_amount } = req.body;
+
+  // Obtener los datos del ticket para validar los pagos
+  const { rows: ticketRows } = await req.exec(
+    `SELECT amount, payment_first_amount FROM tickets WHERE id = $1`,
+    [id]
+  );
+
+  if (!ticketRows.length) {
+    throw "BE004";
+  }
+
+  const ticket = ticketRows[0];
+  const totalAmount = parseFloat(ticket.amount);
+  const firstPayment = parseFloat(ticket.payment_first_amount);
+  const pendingAmount = totalAmount - firstPayment;
+
+  // Si hay un monto pendiente, el segundo pago es obligatorio
+  if (pendingAmount > 0) {
+    if (
+      !payment_second_amount ||
+      parseFloat(payment_second_amount) !== pendingAmount
+    ) {
+      throw "BE106"; // Error: Se requiere el segundo pago por el monto pendiente
+    }
+  }
+
+  // Validar con el schema
+  const { error } = ticketCloseSchema.validate(req.body);
+  if (error) {
+    throw "BE100";
+  }
+
+  const { rows } = await req.exec(
+    `UPDATE tickets SET status = $1, payment_second_amount = COALESCE($2, payment_second_amount), updated_at = NOW() WHERE id = $3 RETURNING *`,
+    ["closed", payment_second_amount, id]
   );
 
   if (!rows.length) {

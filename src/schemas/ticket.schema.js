@@ -38,6 +38,10 @@ export const ticketStatusSchema = Joi.object({
   status: Joi.string().valid("open", "in_progress", "closed").required(),
 });
 
+export const ticketCloseSchema = Joi.object({
+  payment_second_amount: Joi.number().min(0).optional(),
+});
+
 export const ticketEvidenceSchema = Joi.object({
   ticket_id: Joi.number().required(),
   type: Joi.string().required(),
