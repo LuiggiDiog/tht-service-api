@@ -6,7 +6,8 @@
     "start": "node dist/index.js dotenv_config_path=.env.production",
     "dev": "node --watch src/index.js",
     "build": "babel src -d dist",
-    "test": "jest"
+    "test": "jest",
+    "migrate:tickets": "node src/scripts/migrateTicketPublicIds.js"
   },
   "type": "module",
   "keywords": [],

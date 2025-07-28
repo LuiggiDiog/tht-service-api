@@ -3,6 +3,7 @@ import multer from "multer";
 import {
   getTickets,
   getTicket,
+  getTicketByPublicId,
   createTicket,
   updateTicket,
   changeTicketStatus,
@@ -41,6 +42,7 @@ const router = Router();
 // Rutas principales de tickets
 router.get("/", getTickets);
 router.get("/:id", getTicket);
+router.get("/public/:public_id", getTicketByPublicId);
 router.post("/", createTicket);
 router.put("/:id", updateTicket);
 router.put("/:id/status", changeTicketStatus);

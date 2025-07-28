@@ -2,6 +2,7 @@ import Joi from "joi";
 
 export const ticketSchema = Joi.object({
   id: Joi.number().required(),
+  public_id: Joi.string().required(),
   customer_id: Joi.number().integer().required(),
   technician_id: Joi.number().integer().required(),
   device_model: Joi.string().required(),

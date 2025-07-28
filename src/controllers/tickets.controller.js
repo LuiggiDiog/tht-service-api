@@ -7,7 +7,7 @@ import {
   ticketCloseSchema,
 } from "../schemas/ticket.schema.js";
 import { mediaUpload } from "../services/media.js";
-import { DELETE_STATUS } from "../utils/contanst.js";
+import { DELETE_STATUS, generateTicketPublicId } from "../utils/contanst.js";
 
 // Obtener todos los tickets
 export const getTickets = async (req, res) => {
@@ -23,7 +23,7 @@ export const getTickets = async (req, res) => {
     LEFT JOIN customers c ON t.customer_id = c.id
     LEFT JOIN users u ON t.technician_id = u.id
     WHERE t.status != $1
-    ORDER BY t.created_at DESC
+    ORDER BY t.id DESC
   `,
     [DELETE_STATUS]
   );
@@ -164,14 +164,18 @@ export const createTicket = async (req, res) => {
   await req.exec("BEGIN");
 
   try {
+    // Generar ID público único
+    const public_id = generateTicketPublicId();
+
     // Crear el ticket
     const { rows: ticketRows } = await req.exec(
       `
-      INSERT INTO tickets (customer_id, technician_id, device_model, device_serial, description, amount, payment_method, payment_first_amount, payment_second_amount, status, created_by) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+      INSERT INTO tickets (public_id, customer_id, technician_id, device_model, device_serial, description, amount, payment_method, payment_first_amount, payment_second_amount, status, created_by) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
       RETURNING *
     `,
       [
+        public_id,
         customer_id,
         technician_id,
         device_model,
@@ -597,4 +601,84 @@ export const getTicketsByCustomer = async (req, res) => {
   );
 
   return res.resp(rows);
+};
+
+// Obtener un ticket por su public_id
+export const getTicketByPublicId = async (req, res) => {
+  const { public_id } = req.params;
+
+  // Obtener el ticket principal
+  const { rows: ticketRows } = await req.exec(
+    `
+    SELECT t.* FROM tickets t WHERE t.public_id = $1
+  `,
+    [public_id]
+  );
+
+  if (!ticketRows.length) {
+    throw "BE004";
+  }
+
+  const ticket = ticketRows[0];
+
+  // Obtener información del customer
+  if (ticket.customer_id) {
+    const { rows: customerRows } = await req.exec(
+      `SELECT name, last_name, email, phone FROM customers WHERE id = $1`,
+      [ticket.customer_id]
+    );
+    if (customerRows.length) {
+      ticket.customer = customerRows[0];
+    }
+  }
+
+  // Obtener información del technician
+  if (ticket.technician_id) {
+    const { rows: technicianRows } = await req.exec(
+      `SELECT name, email FROM users WHERE id = $1`,
+      [ticket.technician_id]
+    );
+    if (technicianRows.length) {
+      ticket.technician = technicianRows[0];
+    }
+  }
+
+  // Obtener todas las evidencias del ticket
+  const { rows: evidenceRows } = await req.exec(
+    `
+    SELECT te.*
+    FROM ticket_evidences te
+    WHERE te.ticket_id = $1 AND te.status != $2
+    ORDER BY te.created_at ASC
+  `,
+    [ticket.id, DELETE_STATUS]
+  );
+
+  // Obtener los medios para cada evidencia
+  for (let evidence of evidenceRows) {
+    const { rows: mediaRows } = await req.exec(
+      `
+      SELECT * FROM ticket_evidence_media 
+      WHERE evidence_id = $1
+      ORDER BY created_at ASC
+    `,
+      [evidence.id]
+    );
+    evidence.media = mediaRows;
+  }
+
+  // Obtener cambios de piezas
+  const { rows: partChanges } = await req.exec(
+    `
+    SELECT * FROM ticket_part_changes 
+    WHERE ticket_id = $1
+    ORDER BY created_at ASC
+  `,
+    [ticket.id]
+  );
+
+  ticket.evidences = evidenceRows;
+  ticket.part_changes = partChanges;
+
+  return res.resp(ticket);
 };
