@@ -7,6 +7,7 @@ import {
   ticketCloseSchema,
 } from "../schemas/ticket.schema.js";
 import { mediaUpload } from "../services/media.js";
+import { sendTicketNotification } from "../services/email.js";
 import { DELETE_STATUS, generateTicketPublicId } from "../utils/contanst.js";
 
 // Obtener todos los tickets
@@ -131,15 +132,17 @@ export const createTicket = async (req, res) => {
     payment_second_amount,
   } = req.body;
 
-  // Verificar que el cliente existe
+  // Verificar que el cliente existe y obtener sus datos
   const { rows: customerCheck } = await req.exec(
-    `SELECT id FROM customers WHERE id = $1`,
+    `SELECT id, name, last_name, email FROM customers WHERE id = $1`,
     [customer_id]
   );
 
   if (!customerCheck.length) {
     throw "BE004"; // Cliente no encontrado
   }
+
+  const customer = customerCheck[0];
 
   // Verificar que el técnico existe y tiene rol apropiado
   const { rows: technicianCheck } = await req.exec(
@@ -193,6 +196,19 @@ export const createTicket = async (req, res) => {
     const ticket = ticketRows[0];
 
     await req.exec("COMMIT");
+
+    // Enviar email de notificación al cliente
+    try {
+      const customerName = `${customer.name} ${customer.last_name}`.trim();
+      await sendTicketNotification(customer.email, customerName, ticket);
+      console.log(
+        `Email de notificación enviado a ${customer.email} para el ticket ${ticket.public_id}`
+      );
+    } catch (emailError) {
+      console.error("Error enviando email de notificación:", emailError);
+      // No lanzamos el error para no afectar la creación del ticket
+      // El ticket se creó exitosamente aunque el email falle
+    }
 
     return res.resp(ticket);
   } catch (err) {
