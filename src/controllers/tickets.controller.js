@@ -139,19 +139,19 @@ export const createTicket = async (req, res) => {
   );
 
   if (!customerCheck.length) {
-    throw "BE004"; // Cliente no encontrado
+    throw "BE107"; // Cliente no encontrado
   }
 
   const customer = customerCheck[0];
 
   // Verificar que el técnico existe y tiene rol apropiado
   const { rows: technicianCheck } = await req.exec(
-    `SELECT id FROM users WHERE id = $1 AND (role = 'support' OR role = 'admin' OR role = 'super_admin')`,
+    `SELECT id FROM users WHERE id = $1`,
     [technician_id]
   );
 
   if (!technicianCheck.length) {
-    throw "BE004"; // Técnico no encontrado o sin permisos
+    throw "BE108"; // Técnico no encontrado o sin permisos
   }
 
   // Verificar que el usuario creador existe
@@ -264,7 +264,7 @@ export const updateTicket = async (req, res) => {
   );
 
   if (!rows.length) {
-    throw "BE004";
+    throw "BE109";
   }
 
   return res.resp(rows[0]);
@@ -285,7 +285,7 @@ export const changeTicketStatus = async (req, res) => {
   );
 
   if (!rows.length) {
-    throw "BE004";
+    throw "BE109";
   }
 
   return res.resp(rows[0]);
@@ -302,7 +302,7 @@ export const closeTicket = async (req, res) => {
   );
 
   if (!ticketRows.length) {
-    throw "BE004";
+    throw "BE109";
   }
 
   const ticket = ticketRows[0];
@@ -332,7 +332,7 @@ export const closeTicket = async (req, res) => {
   );
 
   if (!rows.length) {
-    throw "BE004";
+    throw "BE400";
   }
 
   return res.resp(rows[0]);
@@ -350,7 +350,7 @@ export const deleteTicket = async (req, res) => {
   );
 
   if (!rows.length) {
-    throw "BE004";
+    throw "BE401";
   }
 
   return res.resp(rows[0]);
@@ -385,7 +385,7 @@ export const createTicketEvidence = async (req, res) => {
   );
 
   if (!ticketCheck.length) {
-    throw "BE004"; // Ticket no encontrado
+    throw "BE109"; // Ticket no encontrado
   }
 
   // Verificar que el usuario existe
@@ -395,7 +395,7 @@ export const createTicketEvidence = async (req, res) => {
   );
 
   if (!userCheck.length) {
-    throw "BE004"; // Usuario no encontrado
+    throw "BE108"; // Usuario no encontrado
   }
 
   // Iniciar transacción
@@ -517,7 +517,7 @@ export const deleteTicketEvidence = async (req, res) => {
   );
 
   if (!rows.length) {
-    throw "BE004";
+    throw "BE401";
   }
 
   return res.resp(rows[0]);
@@ -632,7 +632,7 @@ export const getTicketByPublicId = async (req, res) => {
   );
 
   if (!ticketRows.length) {
-    throw "BE004";
+    throw "BE109";
   }
 
   const ticket = ticketRows[0];

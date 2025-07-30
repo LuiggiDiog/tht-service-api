@@ -107,10 +107,42 @@ const lstErr = [
     status: 400,
   },
   {
+    code: "BE107",
+    message: {
+      es: "Cliente no encontrado",
+      en: "Customer not found",
+    },
+    status: 400,
+  },
+  {
+    code: "BE108",
+    message: {
+      es: "Usuario no encontrado",
+      en: "User not found",
+    },
+    status: 400,
+  },
+  {
+    code: "BE109",
+    message: {
+      es: "Ticket no encontrado",
+      en: "Ticket not found",
+    },
+    status: 400,
+  },
+  {
     code: "BE400",
     message: {
       es: "No se actualizó el registro",
       en: "The record was not updated",
+    },
+    status: 400,
+  },
+  {
+    code: "BE401",
+    message: {
+      es: "No se eliminó el registro",
+      en: "The record was not deleted",
     },
     status: 400,
   },
