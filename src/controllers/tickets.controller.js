@@ -10,25 +10,107 @@ import { mediaUpload } from "../services/media.js";
 import { sendTicketNotification } from "../services/email.js";
 import { DELETE_STATUS, generateTicketPublicId } from "../utils/contanst.js";
 
+// Funciones auxiliares para evitar código repetido
+const getUserInfo = async (req, userId) => {
+  if (!userId) return null;
+  const { rows } = await req.exec(
+    `SELECT name, email FROM users WHERE id = $1`,
+    [userId]
+  );
+  return rows.length ? rows[0] : null;
+};
+
+const getCustomerInfo = async (req, customerId) => {
+  if (!customerId) return null;
+  const { rows } = await req.exec(
+    `SELECT name, last_name, email, phone FROM customers WHERE id = $1`,
+    [customerId]
+  );
+  return rows.length ? rows[0] : null;
+};
+
+const getTechnicianInfo = async (req, technicianId) => {
+  if (!technicianId) return null;
+  const { rows } = await req.exec(
+    `SELECT name, email FROM users WHERE id = $1`,
+    [technicianId]
+  );
+  return rows.length ? rows[0] : null;
+};
+
+const enrichTicketWithRelations = async (req, ticket) => {
+  // Obtener información del customer
+  if (ticket.customer_id) {
+    ticket.customer = await getCustomerInfo(req, ticket.customer_id);
+  }
+
+  // Obtener información del technician
+  if (ticket.technician_id) {
+    ticket.technician = await getTechnicianInfo(req, ticket.technician_id);
+  }
+
+  // Obtener información del creador del ticket
+  if (ticket.created_by) {
+    ticket.created_by_user = await getUserInfo(req, ticket.created_by);
+  }
+
+  return ticket;
+};
+
+const getTicketEvidencesWithMedia = async (req, ticketId) => {
+  const { rows: evidenceRows } = await req.exec(
+    `
+    SELECT te.*
+    FROM ticket_evidences te
+    WHERE te.ticket_id = $1 AND te.status != $2
+    ORDER BY te.created_at ASC
+  `,
+    [ticketId, DELETE_STATUS]
+  );
+
+  // Obtener los medios para cada evidencia
+  for (let evidence of evidenceRows) {
+    const { rows: mediaRows } = await req.exec(
+      `
+      SELECT * FROM ticket_evidence_media 
+      WHERE evidence_id = $1
+      ORDER BY created_at ASC
+    `,
+      [evidence.id]
+    );
+    evidence.media = mediaRows;
+  }
+
+  return evidenceRows;
+};
+
+const getTicketPartChanges = async (req, ticketId) => {
+  const { rows: partChanges } = await req.exec(
+    `
+    SELECT * FROM ticket_part_changes 
+    WHERE ticket_id = $1
+    ORDER BY created_at ASC
+  `,
+    [ticketId]
+  );
+
+  return partChanges;
+};
+
 // Obtener todos los tickets
 export const getTickets = async (req, res) => {
-  const { rows } = await req.exec(
-    `
-    SELECT t.*, 
-           c.name as customer_name, 
-           c.email as customer_email,
-           c.phone as customer_phone,
-           u.name as technician_name,
-           u.email as technician_email
-    FROM tickets t
-    LEFT JOIN customers c ON t.customer_id = c.id
-    LEFT JOIN users u ON t.technician_id = u.id
-    WHERE t.status != $1
-    ORDER BY t.id DESC
-  `,
+  // Obtener todos los tickets
+  const { rows: ticketRows } = await req.exec(
+    `SELECT * FROM tickets WHERE status != $1 ORDER BY id DESC`,
     [DELETE_STATUS]
   );
-  return res.resp(rows);
+
+  // Enriquecer cada ticket con información de relaciones
+  for (let ticket of ticketRows) {
+    await enrichTicketWithRelations(req, ticket);
+  }
+
+  return res.resp(ticketRows);
 };
 
 // Obtener un ticket específico con todas sus evidencias
@@ -49,63 +131,16 @@ export const getTicket = async (req, res) => {
 
   const ticket = ticketRows[0];
 
-  // Obtener información del customer
-  if (ticket.customer_id) {
-    const { rows: customerRows } = await req.exec(
-      `SELECT name, last_name, email, phone FROM customers WHERE id = $1`,
-      [ticket.customer_id]
-    );
-    if (customerRows.length) {
-      ticket.customer = customerRows[0];
-    }
-  }
-
-  // Obtener información del technician
-  if (ticket.technician_id) {
-    const { rows: technicianRows } = await req.exec(
-      `SELECT name, email FROM users WHERE id = $1`,
-      [ticket.technician_id]
-    );
-    if (technicianRows.length) {
-      ticket.technician = technicianRows[0];
-    }
-  }
+  // Enriquecer el ticket con información de relaciones
+  await enrichTicketWithRelations(req, ticket);
 
   // Obtener todas las evidencias del ticket
-  const { rows: evidenceRows } = await req.exec(
-    `
-    SELECT te.*
-    FROM ticket_evidences te
-    WHERE te.ticket_id = $1 AND te.status != $2
-    ORDER BY te.created_at ASC
-  `,
-    [id, DELETE_STATUS]
-  );
-
-  // Obtener los medios para cada evidencia
-  for (let evidence of evidenceRows) {
-    const { rows: mediaRows } = await req.exec(
-      `
-      SELECT * FROM ticket_evidence_media 
-      WHERE evidence_id = $1
-      ORDER BY created_at ASC
-    `,
-      [evidence.id]
-    );
-    evidence.media = mediaRows;
-  }
+  const evidences = await getTicketEvidencesWithMedia(req, ticket.id);
 
   // Obtener cambios de piezas
-  const { rows: partChanges } = await req.exec(
-    `
-    SELECT * FROM ticket_part_changes 
-    WHERE ticket_id = $1
-    ORDER BY created_at ASC
-  `,
-    [id]
-  );
+  const partChanges = await getTicketPartChanges(req, ticket.id);
 
-  ticket.evidences = evidenceRows;
+  ticket.evidences = evidences;
   ticket.part_changes = partChanges;
 
   return res.resp(ticket);
@@ -122,7 +157,6 @@ export const createTicket = async (req, res) => {
   const created_by = req.user.id;
   const {
     customer_id,
-    technician_id,
     device_model,
     device_serial,
     description,
@@ -131,6 +165,9 @@ export const createTicket = async (req, res) => {
     payment_first_amount,
     payment_second_amount,
   } = req.body;
+
+  // TEMPORAL: Siempre usar technician_id = 2
+  const technician_id = 2;
 
   // Verificar que el cliente existe y obtener sus datos
   const { rows: customerCheck } = await req.exec(
@@ -228,7 +265,6 @@ export const updateTicket = async (req, res) => {
   const { id } = req.params;
   const {
     customer_id,
-    technician_id,
     device_model,
     device_serial,
     description,
@@ -239,6 +275,9 @@ export const updateTicket = async (req, res) => {
     status,
     created_by,
   } = req.body;
+
+  // TEMPORAL: Siempre usar technician_id = 2
+  const technician_id = 2;
 
   const { rows } = await req.exec(
     `
@@ -479,33 +518,14 @@ export const createTicketEvidence = async (req, res) => {
 export const getTicketEvidences = async (req, res) => {
   const { ticket_id } = req.params;
 
-  const { rows } = await req.exec(
-    `
-    SELECT te.*, 
-           u.name as user_name,
-           u.email as user_email
-    FROM ticket_evidences te
-    LEFT JOIN users u ON te.created_by = u.id
-    WHERE te.ticket_id = $1
-    ORDER BY te.created_at ASC
-  `,
-    [ticket_id]
-  );
+  const evidences = await getTicketEvidencesWithMedia(req, ticket_id);
 
-  // Obtener los medios para cada evidencia
-  for (let evidence of rows) {
-    const { rows: mediaRows } = await req.exec(
-      `
-      SELECT * FROM ticket_evidence_media 
-      WHERE evidence_id = $1
-      ORDER BY created_at ASC
-    `,
-      [evidence.id]
-    );
-    evidence.media = mediaRows;
+  // Para cada evidencia, obtener información del usuario creador
+  for (let evidence of evidences) {
+    evidence.created_by_user = await getUserInfo(req, evidence.created_by);
   }
 
-  return res.resp(rows);
+  return res.resp(evidences);
 };
 
 export const deleteTicketEvidence = async (req, res) => {
@@ -561,19 +581,40 @@ export const getPartChanges = async (req, res) => {
 
   const { rows } = await req.exec(
     `
-    SELECT tpc.*,
-           te_removed.comment as removed_comment,
-           te_removed.created_at as removed_at,
-           te_installed.comment as installed_comment,
-           te_installed.created_at as installed_at
+    SELECT tpc.*
     FROM ticket_part_changes tpc
-    LEFT JOIN ticket_evidences te_removed ON tpc.removed_evidence_id = te_removed.id
-    LEFT JOIN ticket_evidences te_installed ON tpc.installed_evidence_id = te_installed.id
     WHERE tpc.ticket_id = $1
     ORDER BY tpc.created_at ASC
   `,
     [ticket_id]
   );
+
+  // Para cada cambio de pieza, obtener información adicional
+  for (let partChange of rows) {
+    // Obtener información del usuario creador
+    partChange.created_by_user = await getUserInfo(req, partChange.created_by);
+
+    // Obtener información de las evidencias relacionadas
+    if (partChange.removed_evidence_id) {
+      const { rows: removedEvidenceRows } = await req.exec(
+        `SELECT comment, created_at FROM ticket_evidences WHERE id = $1`,
+        [partChange.removed_evidence_id]
+      );
+      if (removedEvidenceRows.length) {
+        partChange.removed_evidence = removedEvidenceRows[0];
+      }
+    }
+
+    if (partChange.installed_evidence_id) {
+      const { rows: installedEvidenceRows } = await req.exec(
+        `SELECT comment, created_at FROM ticket_evidences WHERE id = $1`,
+        [partChange.installed_evidence_id]
+      );
+      if (installedEvidenceRows.length) {
+        partChange.installed_evidence = installedEvidenceRows[0];
+      }
+    }
+  }
 
   return res.resp(rows);
 };
@@ -582,41 +623,34 @@ export const getPartChanges = async (req, res) => {
 export const getTicketsByTechnician = async (req, res) => {
   const { technician_id } = req.params;
 
-  const { rows } = await req.exec(
-    `
-    SELECT t.*, 
-           c.name as customer_name, 
-           c.email as customer_email,
-           c.phone as customer_phone
-    FROM tickets t
-    LEFT JOIN customers c ON t.customer_id = c.id
-    WHERE t.technician_id = $1
-    ORDER BY t.created_at DESC
-  `,
+  const { rows: ticketRows } = await req.exec(
+    `SELECT * FROM tickets WHERE technician_id = $1 ORDER BY created_at DESC`,
     [technician_id]
   );
 
-  return res.resp(rows);
+  // Enriquecer cada ticket con información de relaciones
+  for (let ticket of ticketRows) {
+    await enrichTicketWithRelations(req, ticket);
+  }
+
+  return res.resp(ticketRows);
 };
 
 // Obtener tickets por cliente
 export const getTicketsByCustomer = async (req, res) => {
   const { customer_id } = req.params;
 
-  const { rows } = await req.exec(
-    `
-    SELECT t.*, 
-           u.name as technician_name,
-           u.email as technician_email
-    FROM tickets t
-    LEFT JOIN users u ON t.technician_id = u.id
-    WHERE t.customer_id = $1
-    ORDER BY t.created_at DESC
-  `,
+  const { rows: ticketRows } = await req.exec(
+    `SELECT * FROM tickets WHERE customer_id = $1 ORDER BY created_at DESC`,
     [customer_id]
   );
 
-  return res.resp(rows);
+  // Enriquecer cada ticket con información de relaciones
+  for (let ticket of ticketRows) {
+    await enrichTicketWithRelations(req, ticket);
+  }
+
+  return res.resp(ticketRows);
 };
 
 // Obtener un ticket por su public_id
@@ -637,63 +671,16 @@ export const getTicketByPublicId = async (req, res) => {
 
   const ticket = ticketRows[0];
 
-  // Obtener información del customer
-  if (ticket.customer_id) {
-    const { rows: customerRows } = await req.exec(
-      `SELECT name, last_name, email, phone FROM customers WHERE id = $1`,
-      [ticket.customer_id]
-    );
-    if (customerRows.length) {
-      ticket.customer = customerRows[0];
-    }
-  }
-
-  // Obtener información del technician
-  if (ticket.technician_id) {
-    const { rows: technicianRows } = await req.exec(
-      `SELECT name, email FROM users WHERE id = $1`,
-      [ticket.technician_id]
-    );
-    if (technicianRows.length) {
-      ticket.technician = technicianRows[0];
-    }
-  }
+  // Enriquecer el ticket con información de relaciones
+  await enrichTicketWithRelations(req, ticket);
 
   // Obtener todas las evidencias del ticket
-  const { rows: evidenceRows } = await req.exec(
-    `
-    SELECT te.*
-    FROM ticket_evidences te
-    WHERE te.ticket_id = $1 AND te.status != $2
-    ORDER BY te.created_at ASC
-  `,
-    [ticket.id, DELETE_STATUS]
-  );
-
-  // Obtener los medios para cada evidencia
-  for (let evidence of evidenceRows) {
-    const { rows: mediaRows } = await req.exec(
-      `
-      SELECT * FROM ticket_evidence_media 
-      WHERE evidence_id = $1
-      ORDER BY created_at ASC
-    `,
-      [evidence.id]
-    );
-    evidence.media = mediaRows;
-  }
+  const evidences = await getTicketEvidencesWithMedia(req, ticket.id);
 
   // Obtener cambios de piezas
-  const { rows: partChanges } = await req.exec(
-    `
-    SELECT * FROM ticket_part_changes 
-    WHERE ticket_id = $1
-    ORDER BY created_at ASC
-  `,
-    [ticket.id]
-  );
+  const partChanges = await getTicketPartChanges(req, ticket.id);
 
-  ticket.evidences = evidenceRows;
+  ticket.evidences = evidences;
   ticket.part_changes = partChanges;
 
   return res.resp(ticket);

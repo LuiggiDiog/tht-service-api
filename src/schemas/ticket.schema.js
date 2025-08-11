@@ -4,7 +4,7 @@ export const ticketSchema = Joi.object({
   id: Joi.number().required(),
   public_id: Joi.string().required(),
   customer_id: Joi.number().integer().required(),
-  technician_id: Joi.number().integer().required(),
+  technician_id: Joi.number().integer().optional(), // TEMPORAL: Ahora es opcional
   device_model: Joi.string().required(),
   device_serial: Joi.string().required(),
   description: Joi.string().optional(),
@@ -21,7 +21,7 @@ export const ticketSchema = Joi.object({
 export const ticketSchemaCreate = Joi.object({
   id: Joi.number().allow(null).optional(),
   customer_id: Joi.number().integer().required(),
-  technician_id: Joi.number().integer().required(),
+  technician_id: Joi.number().integer().optional(), // TEMPORAL: Ahora es opcional
   device_model: Joi.string().required(),
   device_serial: Joi.string().required(),
   description: Joi.string().required(),
