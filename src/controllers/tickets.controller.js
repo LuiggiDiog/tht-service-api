@@ -254,52 +254,25 @@ export const createTicket = async (req, res) => {
   }
 };
 
-// Actualizar un ticket
+// Actualizar un ticket (solo permite editar el precio)
 export const updateTicket = async (req, res) => {
-  const { error } = ticketSchema.validate(req.body);
-  if (error) {
-    console.log("error", error);
-    throw "BE100";
+  const { id } = req.params;
+  const { amount } = req.body;
+
+  // Validar que el amount sea un número válido
+  if (amount === undefined || amount === null || isNaN(parseFloat(amount))) {
+    throw "BE100"; // Error de validación
   }
 
-  const { id } = req.params;
-  const {
-    customer_id,
-    device_model,
-    device_serial,
-    description,
-    amount,
-    payment_method,
-    payment_first_amount,
-    payment_second_amount,
-    status,
-    created_by,
-  } = req.body;
-
-  // TEMPORAL: Siempre usar technician_id = 2
-  const technician_id = 2;
-
+  // Solo actualizar el campo amount del ticket
   const { rows } = await req.exec(
     `
     UPDATE tickets 
-    SET customer_id = $1, technician_id = $2, device_model = $3, device_serial = $4, description = $5, amount = $6, payment_method = $7, payment_first_amount = $8, payment_second_amount = $9, status = $10, created_by = $11, updated_at = NOW()
-    WHERE id = $12 
+    SET amount = $1, updated_at = NOW()
+    WHERE id = $2 
     RETURNING *
   `,
-    [
-      customer_id,
-      technician_id,
-      device_model,
-      device_serial,
-      description,
-      amount,
-      payment_method,
-      payment_first_amount,
-      payment_second_amount,
-      status,
-      created_by,
-      id,
-    ]
+    [amount, id]
   );
 
   if (!rows.length) {
