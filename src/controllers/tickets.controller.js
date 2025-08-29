@@ -250,7 +250,7 @@ export const createTicket = async (req, res) => {
     return res.resp(ticket);
   } catch (err) {
     await req.exec("ROLLBACK");
-    throw err;
+    throw "BE402";
   }
 };
 
@@ -459,6 +459,12 @@ export const createTicketEvidence = async (req, res) => {
             filename: uploadedFile.originalname || uploadedFile.name,
             error: fileError.message,
           });
+
+          throw new Error(
+            `Error al procesar archivo ${
+              uploadedFile.originalname || uploadedFile.name
+            }: ${fileError.message}`
+          );
         }
       }
     }
@@ -483,7 +489,7 @@ export const createTicketEvidence = async (req, res) => {
     return res.resp(response);
   } catch (err) {
     await req.exec("ROLLBACK");
-    throw err;
+    throw "BE402";
   }
 };
 

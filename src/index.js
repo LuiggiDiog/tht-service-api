@@ -28,8 +28,8 @@ import authMiddle from "./middlewares/auth.middle.js";
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ limit: "25mb", extended: true }));
+app.use(express.json({ limit: "35mb" }));
+app.use(express.urlencoded({ limit: "35mb", extended: true }));
 
 app.use(baseMiddle);
 

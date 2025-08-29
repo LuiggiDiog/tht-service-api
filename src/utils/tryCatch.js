@@ -146,6 +146,14 @@ const lstErr = [
     },
     status: 400,
   },
+  {
+    code: "BE402",
+    message: {
+      es: "No se guardó el registro",
+      en: "The record was not saved",
+    },
+    status: 400,
+  },
 ];
 
 export function errHandler(fn) {
