@@ -4,7 +4,7 @@ import { DELETE_STATUS } from "../utils/contanst.js";
 
 export const getUsers = async (req, res) => {
   const { rows } = await req.exec(
-    `SELECT * FROM users WHERE status != $1 ORDER BY created_at asc`,
+    `SELECT * FROM users WHERE status != $1 ORDER BY id asc`,
     [DELETE_STATUS]
   );
   // Eliminar password de cada usuario

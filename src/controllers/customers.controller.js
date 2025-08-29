@@ -6,7 +6,7 @@ import { DELETE_STATUS } from "../utils/contanst.js";
 
 export const getCustomers = async (req, res) => {
   const { rows } = await req.exec(
-    `SELECT * FROM customers WHERE status != $1 ORDER BY created_at DESC`,
+    `SELECT * FROM customers WHERE status != $1 ORDER BY id DESC`,
     [DELETE_STATUS]
   );
   return res.resp(rows);
