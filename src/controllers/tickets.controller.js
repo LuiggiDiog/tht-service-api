@@ -9,6 +9,7 @@ import {
 import { mediaUpload } from "../services/media.js";
 import { sendTicketNotification } from "../services/email.js";
 import { DELETE_STATUS, generateTicketPublicId } from "../utils/contanst.js";
+import { pool } from "../connection.js";
 
 // Funciones auxiliares para evitar código repetido
 const getUserInfo = async (req, userId) => {
@@ -410,12 +411,49 @@ export const createTicketEvidence = async (req, res) => {
     throw "BE108"; // Usuario no encontrado
   }
 
-  // Iniciar transacción
-  await req.exec("BEGIN");
+  // PASO 1: Procesar archivos FUERA de la transacción (operación externa lenta)
+  const uploadedMediaData = [];
+  const failedUploads = [];
+
+  if (uploadedFiles.length > 0) {
+    for (const uploadedFile of uploadedFiles) {
+      try {
+        // Subir archivo usando el servicio de media (operación externa)
+        const uploadResult = await mediaUpload(uploadedFile);
+        //TODO: Eliminar
+        console.log("uploadResult", uploadResult);
+        const mediaData = uploadResult.file;
+
+        uploadedMediaData.push({
+          media_type: mediaData.type,
+          storage_id: mediaData.id,
+          url: mediaData.public_url,
+        });
+      } catch (fileError) {
+        console.error("Error procesando archivo:", fileError);
+        failedUploads.push({
+          filename: uploadedFile.originalname || uploadedFile.name,
+          error: fileError.message,
+        });
+
+        throw new Error(
+          `Error al procesar archivo ${
+            uploadedFile.originalname || uploadedFile.name
+          }: ${fileError.message}`
+        );
+      }
+    }
+  }
+
+  // PASO 2: Usar UNA SOLA CONEXIÓN para toda la transacción
+  const client = await pool.connect();
 
   try {
+    // Iniciar transacción en la conexión dedicada
+    await client.query("BEGIN");
+
     // Crear la evidencia
-    const { rows: evidenceRows } = await req.exec(
+    const { rows: evidenceRows } = await client.query(
       `
       INSERT INTO ticket_evidences (ticket_id, type, created_by, comment) 
       VALUES ($1, $2, $3, $4) 
@@ -430,66 +468,44 @@ export const createTicketEvidence = async (req, res) => {
     );
 
     const evidence = evidenceRows[0];
-    const failedUploads = [];
+    //TODO: Eliminar
+    console.log("evidence", evidence);
 
-    // Procesar archivos subidos si los hay
-    if (uploadedFiles.length > 0) {
-      for (const uploadedFile of uploadedFiles) {
-        try {
-          // Subir archivo usando el servicio de media
-          const uploadResult = await mediaUpload(uploadedFile);
-          const mediaData = uploadResult.file;
-
-          // Crear registro en ticket_evidence_media
-          await req.exec(
-            `
-            INSERT INTO ticket_evidence_media (evidence_id, media_type, storage_id, url) 
-            VALUES ($1, $2, $3, $4)
-          `,
-            [
-              evidence.id,
-              mediaData.type,
-              mediaData.id, // storage_id del servicio de media
-              mediaData.public_url, // URL del archivo subido
-            ]
-          );
-        } catch (fileError) {
-          console.error("Error procesando archivo:", fileError);
-          failedUploads.push({
-            filename: uploadedFile.originalname || uploadedFile.name,
-            error: fileError.message,
-          });
-
-          throw new Error(
-            `Error al procesar archivo ${
-              uploadedFile.originalname || uploadedFile.name
-            }: ${fileError.message}`
-          );
-        }
-      }
+    // Insertar registros de media ya procesados (operación rápida)
+    for (const mediaData of uploadedMediaData) {
+      await client.query(
+        `
+        INSERT INTO ticket_evidence_media (evidence_id, media_type, storage_id, url) 
+        VALUES ($1, $2, $3, $4)
+      `,
+        [evidence.id, mediaData.media_type, mediaData.storage_id, mediaData.url]
+      );
     }
 
     // Si la evidencia es de tipo 'delivery', automáticamente cambiar el estado del ticket a 'closed'
     if (validationData.type === "delivery") {
-      await req.exec(
+      await client.query(
         `UPDATE tickets SET status = 'closed', updated_at = NOW() WHERE id = $1`,
         [validationData.ticket_id]
       );
     }
 
-    await req.exec("COMMIT");
+    await client.query("COMMIT");
 
     // Agregar información sobre archivos fallidos si los hay
     const response = {
       ...evidence,
-      uploaded_files_count: uploadedFiles.length - failedUploads.length,
+      uploaded_files_count: uploadedMediaData.length,
       failed_uploads: failedUploads.length > 0 ? failedUploads : undefined,
     };
 
     return res.resp(response);
   } catch (err) {
-    await req.exec("ROLLBACK");
+    await client.query("ROLLBACK");
     throw "BE402";
+  } finally {
+    // SIEMPRE liberar la conexión
+    client.release();
   }
 };
 
