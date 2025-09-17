@@ -176,3 +176,8 @@ INSERT INTO customers (name, last_name, email, phone, address, company, rfc, sta
 VALUES
   ('Juan', 'Pérez', 'customer1@gmail.com', '1234567890', 'Av. Principal 123', 'Empresa ABC', 'ABC123456789', 'active'),
   ('María', 'González', 'customer2@gmail.com', '0987654321', 'Calle Secundaria 456', 'Empresa XYZ', 'XYZ987654321', 'active');
+
+
+
+-- Agregar campo de ubicación del dispositivo a la tabla tickets
+ALTER TABLE tickets ADD COLUMN device_location VARCHAR(100) NOT NULL DEFAULT 'in-branch';

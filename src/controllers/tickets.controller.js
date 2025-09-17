@@ -165,6 +165,7 @@ export const createTicket = async (req, res) => {
     payment_method,
     payment_first_amount,
     payment_second_amount,
+    device_location,
   } = req.body;
 
   // TEMPORAL: Siempre usar technician_id = 2
@@ -211,8 +212,8 @@ export const createTicket = async (req, res) => {
     // Crear el ticket
     const { rows: ticketRows } = await req.exec(
       `
-      INSERT INTO tickets (public_id, customer_id, technician_id, device_model, device_serial, description, amount, payment_method, payment_first_amount, payment_second_amount, status, created_by) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
+      INSERT INTO tickets (public_id, customer_id, technician_id, device_model, device_serial, description, amount, payment_method, payment_first_amount, payment_second_amount, status, created_by, device_location) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
       RETURNING *
     `,
       [
@@ -228,6 +229,7 @@ export const createTicket = async (req, res) => {
         payment_second_amount,
         "open",
         created_by,
+        device_location,
       ]
     );
 
@@ -258,22 +260,24 @@ export const createTicket = async (req, res) => {
 // Actualizar un ticket (solo permite editar el precio)
 export const updateTicket = async (req, res) => {
   const { id } = req.params;
-  const { amount } = req.body;
+  const { amount, device_location } = req.body;
 
   // Validar que el amount sea un número válido
   if (amount === undefined || amount === null || isNaN(parseFloat(amount))) {
     throw "BE100"; // Error de validación
   }
 
-  // Solo actualizar el campo amount del ticket
+  // Actualizar el campo amount y device_location del ticket
   const { rows } = await req.exec(
     `
     UPDATE tickets 
-    SET amount = $1, updated_at = NOW()
-    WHERE id = $2 
+    SET amount = $1,
+        device_location = COALESCE($2, device_location),
+        updated_at = NOW()
+    WHERE id = $3 
     RETURNING *
   `,
-    [amount, id]
+    [amount, device_location, id]
   );
 
   if (!rows.length) {
