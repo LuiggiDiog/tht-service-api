@@ -181,3 +181,8 @@ VALUES
 
 -- Agregar campo de ubicación del dispositivo a la tabla tickets
 ALTER TABLE tickets ADD COLUMN device_location VARCHAR(100) NOT NULL DEFAULT 'in-branch';
+
+-- Establecer string vacío como valor por defecto en device_location
+ALTER TABLE tickets ALTER COLUMN device_location SET DEFAULT '';
+-- Actualizar device_location a string vacío en todos los registros existentes
+UPDATE tickets SET device_location = '';

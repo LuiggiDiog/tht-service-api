@@ -17,6 +17,7 @@ export const ticketSchema = Joi.object({
   created_at: Joi.date().optional(),
   updated_at: Joi.date().optional(),
   device_location: Joi.string().max(100).optional(),
+  device_location: Joi.string().max(100).allow("").optional(),
 });
 
 export const ticketSchemaCreate = Joi.object({
@@ -34,7 +35,7 @@ export const ticketSchemaCreate = Joi.object({
 
   evidence_type: Joi.string().optional(),
   evidence_comment: Joi.string().optional(),
-  device_location: Joi.string().max(100).optional(),
+  device_location: Joi.string().max(100).allow("").optional(),
 });
 
 export const ticketStatusSchema = Joi.object({
